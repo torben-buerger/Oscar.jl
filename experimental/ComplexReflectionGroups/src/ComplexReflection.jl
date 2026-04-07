@@ -215,7 +215,9 @@ function is_complex_reflection_with_data(w::MatElem{T}; debug::Bool=false) where
 
   # Now, we need to determine the scalar zeta by which w acts on alpha (we do not yet know
   # whether w is a root of unity (which is equivalent to w being of finite order).
-  alpha_w = alpha*w
+  rank_alpha = rank(parent(alpha))
+  alpha_vec = [alpha[i] for i=1:rank_alpha]
+  alpha_w = alpha_vec*w
 
   # We need a non-zero entry of alpha for this
   i=1
