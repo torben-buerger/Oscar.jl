@@ -1,8 +1,5 @@
 using Oscar
 
-# Load the project file
-include("/home/torben/complex_reflection_group_package/ComplexReflectionGroups.jl");
-
 ###########################################################################################
 # Structure to store the reflections in a hyperplane and the hyperplane itself
 ###########################################################################################
@@ -79,6 +76,7 @@ end
 
 # Construct the structure ReflectionLibrary for a given group, by determining the reflections, grouping them by their hyperplanes and grouping the hyperplanes by their orbits under the group action
 function build_ReflectionLibrary(group)
+    group_description = describe(group)  # In order to get GAP finding the conjugacy classes, we need to call the describe function on the group
     # Get the conjugacy classes of the group
     classes = conjugacy_classes(group)
     reflslist = []
@@ -168,12 +166,10 @@ function build_ReflectionLibrary(group)
         # Within this orbit, group the reflections belonging to the orbit by their hyperplanes
         hyperplane_groups = Vector{HyperplaneOrbit{S, T}}()
         orbit_remaining_refls = copy(orbit_refsl)
-        orbit_remaining_hyperplanes = copy(orbit_hyperplanes)
         orb_hyperplanes_struct = Vector{ReflectionHyperplane{S, T}}()
 
-        while !isempty(orbit_remaining_hyperplanes)
-            target_H = orbit_remaining_hyperplanes[1]
-            filter!(h -> h != target_H, orbit_remaining_hyperplanes)  # Remove the target hyperplane from the remaining hyperplanes in this orbit
+        while !isempty(orbit_remaining_refls)
+            target_H = hyperplane(orbit_remaining_refls[1])
             
             # All reflections sharing this exact hyperplane
             same_H = build_ReflectionHyperplane(target_H, orbit_remaining_refls)
@@ -223,6 +219,6 @@ function reflections_in_hyperplane(H::ReflectionHyperplane)
 end
 
 # Get the hyperplane of a ReflectionHyperplane structure
-function hyperplane(H::ReflectionHyperplane)
+function hyperplane_from_ReflectionHyperplane(H::ReflectionHyperplane)
     return H.hyperplane
 end
