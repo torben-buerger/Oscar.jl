@@ -21,8 +21,10 @@ include("complex_reflection_group_Magma.jl")
 include("complex_reflection_group_CHEVIE.jl")
 
 include("symplectic_reflection_group.jl")
+include("reflection_library_test.jl")
 
 # Exports
+export build_ReflectionLibrary
 export canonical_pairing
 export codegrees
 export coexponents
@@ -40,9 +42,13 @@ export coroot_form
 export coxeter_number
 export degrees
 export eigenvalue
+export flat_reflections
 export hyperplane
 export hyperplane_basis
+export hyperplane_from_ReflectionHyperplane
 export hyperplane_inclusion
+export hyperplane_orbits
+export hyperplanes_in_orbit
 export is_complex_reflection
 export is_complex_reflection_group
 export is_complex_reflection_with_data
@@ -66,6 +72,7 @@ export number_of_components
 export number_of_hyperplanes
 export number_of_reflections
 export number_of_reflection_classes
+export reflections_in_hyperplane
 export root_line
 export root_line_inclusion
 export symplectic_doubling
