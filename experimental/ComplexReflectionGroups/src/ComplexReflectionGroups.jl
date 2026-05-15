@@ -45,7 +45,6 @@ export eigenvalue
 export flat_reflections
 export hyperplane
 export hyperplane_basis
-export hyperplane_from_ReflectionHyperplane
 export hyperplane_inclusion
 export hyperplane_orbits
 export hyperplanes_in_orbit
@@ -72,6 +71,9 @@ export number_of_components
 export number_of_hyperplanes
 export number_of_reflections
 export number_of_reflection_classes
+export reflection
+export reflection_hyperplane
+export reflection_orbit
 export reflections_in_hyperplane
 export root_line
 export root_line_inclusion
