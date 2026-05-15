@@ -4,7 +4,9 @@ using Oscar
 # Structure to store the reflections in a hyperplane and the hyperplane itself
 ###########################################################################################
 struct ReflectionHyperplane{S, T}
-    hyperplane::S
+    hyperplane::S  
+    hyperplane_inclusion::AbstractAlgebra.Generic.ModuleHomomorphism{T}
+    hyperplane_basis::Vector{AbstractAlgebra.Generic.FreeModuleElem{T}}
     reflections::Vector{ComplexReflection{T}}
 end
 
@@ -66,7 +68,9 @@ function build_ReflectionHyperplane(H, reflections)
 
     # Sort the reflections on the same hyperplane by eigenvalue by order and eigenvalue
     sort!(same_H, by = r -> (order(r), get_eigenvalue_order(r)))
-    return ReflectionHyperplane(H, same_H)
+    hp_inc = hyperplane_inclusion(same_H[1])
+    hp_basis = hyperplane_basis(same_H[1])
+    return ReflectionHyperplane(H, hp_inc, hp_basis, same_H)
 end
 
 # Construct the structure HyperplaneOrbit for a given list of hyperplanes, that are saved as ReflectionHyperplane structures with the reflections belonging to them
@@ -75,27 +79,51 @@ function build_HyperplaneOrbit(orbit_hyperplanes)
 end
 
 # Construct the structure ReflectionLibrary for a given group, by determining the reflections, grouping them by their hyperplanes and grouping the hyperplanes by their orbits under the group action
-function build_ReflectionLibrary(group)
-    group_description = describe(group)  # In order to get GAP finding the conjugacy classes, we need to call the describe function on the group
-    # Get the conjugacy classes of the group
-    classes = conjugacy_classes(group)
-    reflslist = []
+function build_ReflectionLibrary(group, no_classes::Bool=false)
+    # We only work with matrix groups over fields of characteristic 0
+    if characteristic(base_ring(group)) != 0
+        throw(ArgumentError("Base ring of matrix group is not of characteristic 0."))
+    end
 
-    for rep in classes
-        b, w_data = is_complex_reflection_with_data(matrix(representative(rep)))
-        if b
-            refl_conj_class = [g for g in rep]  # If one element of the conjugacy class is a reflection, all are, so we can take the whole class and add it to the list of reflections
-            for g in refl_conj_class
-                b, w_data = is_complex_reflection_with_data(g)
+    reflslist = []
+    # The describe function may take very long for larger groups, thus it might be switched off. Then, it is not possible to compute the conjugacy classes using GAP
+    if no_classes
+        for g in group
+            b, w_data = is_complex_reflection_with_data(g)
+            if b
                 push!(reflslist, w_data)
             end
         end
+    else
+        group_description = describe(group)  # In order to get GAP finding the conjugacy classes, we need to call the describe function on the group
+        # Get the conjugacy classes of the group
+        classes = conjugacy_classes(group)
+        
+        for rep in classes
+            b, w_data = is_complex_reflection_with_data(matrix(representative(rep)))
+            if b
+                refl_conj_class = [g for g in rep]  # If one element of the conjugacy class is a reflection, all are, so we can take the whole class and add it to the list of reflections
+                for g in refl_conj_class
+                    b, w_data = is_complex_reflection_with_data(g)
+                    print(matrix(g))
+                    push!(reflslist, w_data)
+                    print(matrix(w_data))
+                end
+            end
+        end
+    end
+
+
+    # If there are no reflections in the given group, the function terminates and returns an empty list
+    if reflslist == []
+        return []
     end
 
     # Sort the list of reflections, corresponding to the "Quick" routine in CHAMP
     refl_map = Dict(matrix(r) => r for r in reflslist)
     sorted_refls = Vector{typeof(reflslist[1])}()
     seen_matrices = Vector{typeof(matrix(reflslist[1]))}()
+    remaining_matrices = Vector{typeof(reflslist[1])}()
 
     for i in 1:ngens(group)  # Go through the generators and take their powers until we have found all reflections which will be sorted by their occurrence in this enumeration
         gen_mat = matrix(gens(group)[i])
@@ -112,8 +140,12 @@ function build_ReflectionLibrary(group)
     # If not all reflections were found, the remanining ones are added at the end
     for r in reflslist
         if !(matrix(r) in seen_matrices)
-            push!(sorted_refls, r)
+            push!(remaining_matrices, r)
         end
+    end
+    sort!(remaining_matrices, by = r -> (order(r), get_eigenvalue_order(r)))
+    for r in remaining_matrices
+        push!(sorted_refls, r)
     end
 
     # Define the types for the hyperplanes and the reflections to be able to properly initialize the library hierarchy
@@ -145,9 +177,9 @@ function build_ReflectionLibrary(group)
         X = gset(group, act, [H_basis_matrix])
         orb_hyperplanes = orbit(X, H_basis_matrix)
         orb_list = collect(orb_hyperplanes)
-
-        # Find all reflections and hyperplanesbelonging to this orbit
-        orbit_refsl = []
+        
+        # Find all reflections and hyperplanes belonging to this orbit
+        orbit_refls = []
         orbit_hyperplanes = []
         V = vector_space(K, rank_H)
         for r in remaining_refls
@@ -156,16 +188,16 @@ function build_ReflectionLibrary(group)
                 H_oh = sub(V, [V(row) for row in rows])[1]  # Get the hyperplane as a subspace to compare it with the hyperplane of the reflection
                 push!(orbit_hyperplanes, H_oh)
                 if H_oh == hyperplane(r)
-                    push!(orbit_refsl, r)
+                    push!(orbit_refls, r)
                     break
                 end
             end
         end
-        filter!(r -> !(r in orbit_refsl), remaining_refls)  # Remove the reflections in this orbit from the remaining reflections
+        filter!(r -> !(r in orbit_refls), remaining_refls)  # Remove the reflections in this orbit from the remaining reflections
           
         # Within this orbit, group the reflections belonging to the orbit by their hyperplanes
         hyperplane_groups = Vector{HyperplaneOrbit{S, T}}()
-        orbit_remaining_refls = copy(orbit_refsl)
+        orbit_remaining_refls = copy(orbit_refls)
         orb_hyperplanes_struct = Vector{ReflectionHyperplane{S, T}}()
 
         while !isempty(orbit_remaining_refls)
@@ -176,7 +208,7 @@ function build_ReflectionLibrary(group)
             filter!(r -> !(r in same_H.reflections), orbit_remaining_refls)  # Remove the reflections sharing this hyperplane from the remaining reflections in this orbit
             push!(orb_hyperplanes_struct, same_H)
         end
-
+        
         hyperplane_groups = build_HyperplaneOrbit(orb_hyperplanes_struct)
         push!(library_hierarchy, hyperplane_groups)
     end
@@ -221,4 +253,14 @@ end
 # Get the hyperplane of a ReflectionHyperplane structure
 function hyperplane_from_ReflectionHyperplane(H::ReflectionHyperplane)
     return H.hyperplane
+end
+
+# Get the hyperplane of a ReflectionHyperplane structure
+function hyperplane_inclusion_from_ReflectionHyperplane(H::ReflectionHyperplane)
+    return H.hyperplane_inclusion
+end
+
+# Get the hyperplane of a ReflectionHyperplane structure
+function hyperplane_basis_from_ReflectionHyperplane(H::ReflectionHyperplane)
+    return H.hyperplane_basis
 end
