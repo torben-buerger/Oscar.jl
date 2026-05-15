@@ -28,12 +28,26 @@ function Base.show(io::IO, ::MIME"text/plain", o::HyperplaneOrbit)
 end
 
 ###########################################################################################
+# Structure to store the reflection, the hyperplane fixed by it, the orbit in which its hyperplane lies
+###########################################################################################
+struct ReflectionData{S, T}
+    orbit::HyperplaneOrbit{S, T}
+    ref_hyperplane::ReflectionHyperplane{S, T}
+    reflection::ComplexReflection{T}
+end
+
+# Printing
+function Base.show(io::IO, ::MIME"text/plain", r::ReflectionData)
+    print(io, "Reflection data for complex reflection of order ", (r.reflection).order, " in orbit consisting of ", length((r.orbit).hyperplanes), " hyperplanes")
+end
+
+###########################################################################################
 # Structure to store the orbits of hyperplanes
 ###########################################################################################
 struct ReflectionLibrary{G, S, T}
     group::G
     orbits::Vector{HyperplaneOrbit{S, T}}
-    flat_reflections::Vector{ComplexReflection{T}}
+    flat_reflections::Vector{ReflectionData{S, T}}
 end
 
 # Printing
@@ -78,6 +92,11 @@ function build_HyperplaneOrbit(orbit_hyperplanes)
     return HyperplaneOrbit(orbit_hyperplanes)
 end
 
+# Construct the structure ReflectionData for a reflection when given the ReflectionHyperplane in which it is contained and the HyperplaneOrbit in which the hyperplane lies
+function build_ReflectionData(orbit, hyperplane, reflection)
+    return ReflectionData(orbit, hyperplane, reflection)
+end
+
 # Construct the structure ReflectionLibrary for a given group, by determining the reflections, grouping them by their hyperplanes and grouping the hyperplanes by their orbits under the group action
 function build_ReflectionLibrary(group, no_classes::Bool=false)
     # We only work with matrix groups over fields of characteristic 0
@@ -105,9 +124,7 @@ function build_ReflectionLibrary(group, no_classes::Bool=false)
                 refl_conj_class = [g for g in rep]  # If one element of the conjugacy class is a reflection, all are, so we can take the whole class and add it to the list of reflections
                 for g in refl_conj_class
                     b, w_data = is_complex_reflection_with_data(g)
-                    print(matrix(g))
                     push!(reflslist, w_data)
-                    print(matrix(w_data))
                 end
             end
         end
@@ -214,11 +231,11 @@ function build_ReflectionLibrary(group, no_classes::Bool=false)
     end
 
     # Flatten the library hierarchy and properly type the vectors
-    flat_refls = Vector{ComplexReflection{T}}()
+    flat_refls = Vector{ReflectionData{S, T}}()
     for orb in library_hierarchy
         for hyperplane_group in orb.hyperplanes
             for refl in hyperplane_group.reflections
-                push!(flat_refls, refl)
+                push!(flat_refls, build_ReflectionData(orb, hyperplane_group, refl))
             end
         end
     end
@@ -251,16 +268,31 @@ function reflections_in_hyperplane(H::ReflectionHyperplane)
 end
 
 # Get the hyperplane of a ReflectionHyperplane structure
-function hyperplane_from_ReflectionHyperplane(H::ReflectionHyperplane)
+function hyperplane(H::ReflectionHyperplane)
     return H.hyperplane
 end
 
 # Get the hyperplane of a ReflectionHyperplane structure
-function hyperplane_inclusion_from_ReflectionHyperplane(H::ReflectionHyperplane)
+function hyperplane_inclusion(H::ReflectionHyperplane)
     return H.hyperplane_inclusion
 end
 
 # Get the hyperplane of a ReflectionHyperplane structure
-function hyperplane_basis_from_ReflectionHyperplane(H::ReflectionHyperplane)
+function hyperplane_basis(H::ReflectionHyperplane)
     return H.hyperplane_basis
+end
+
+# Get the orbit of a ReflectionData structure
+function reflection_orbit(r::ReflectionData)
+    return r.orbit
+end
+
+# Get the ReflectionHyperplane of a ReflectionData structure
+function reflection_hyperplane(r::ReflectionData)
+    return r.ref_hyperplane
+end
+
+# Get the reflection of a ReflectionData structure
+function reflection(r::ReflectionData)
+    return r.reflection
 end
